@@ -40,7 +40,7 @@ h1 {
   top: 100px;
   left: 0;
   right: 0;
-  height: calc(100vh - 100px);
+  height: calc(100vh - 200px);
   padding: 0 60px;
   flex-direction: column;
   gap: 0.75rem;

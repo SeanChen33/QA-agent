@@ -123,5 +123,5 @@ async def qa_ask(body: AskRequest):
     return AskResponse(answer=answer, session_id=body.session_id)
 
 
-# For `uvicorn app.main:app --reload`
+# For `uvicorn main:app --reload`
 # No `if __name__ == "__main__"` block needed

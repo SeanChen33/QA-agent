@@ -44,16 +44,9 @@ QA-agent/
 │  └─ .env.local                 # VITE_API_BASE_URL=...
 │
 └─ backend/                      # Python 后端（FastAPI 示例）
-   ├─ app/
-   │  ├─ main.py
-   │  ├─ routers/
-   │  │  └─ qa.py
-   │  ├─ services/
-   │  │  ├─ llm_provider.py
-   │  │  └─ rag.py               # 可选
-   │  └─ schemas.py
+   ├─ main.py
    ├─ requirements.txt           # 或 pyproject.toml
-   └─ .env                       # OPENAI_API_KEY=...
+   └─ .env                       # API KEY 等
 ```
 
 ---
@@ -82,7 +75,7 @@ export MODEL=gpt-4o-mini        # 依实际可用模型而定
 export PORT=8000
 
 # 启动服务（自动重载）
-uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --reload
+uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --reload
 ```
 
 #### 3) 前端启动（Vite + React 示例）
