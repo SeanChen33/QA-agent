@@ -40,15 +40,23 @@ if PROVIDER == "kimi" and not KIMI_API_KEY:
 
 app = FastAPI(title="QA Agent Backend", version="1.0.0")
 
-# CORS for local dev
+# Configurable CORS
+cors_allow_origins_env = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173,http://localhost:3000")
+cors_allow_origin_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX")
+cors_allow_credentials_env = os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower()
+
+allow_credentials = cors_allow_credentials_env in {"1", "true", "yes"}
+origins = [o.strip() for o in cors_allow_origins_env.split(",") if o.strip()]
+
+# If using wildcard "*", credentials must be disabled per CORS spec
+if len(origins) == 1 and origins[0] == "*":
+    allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "*",  # Adjust in production
-    ],
-    allow_credentials=True,
+    allow_origins=origins,
+    allow_origin_regex=cors_allow_origin_regex or None,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
