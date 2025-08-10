@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import botIcon from './assets/bot.svg'
 import userIcon from './assets/user.svg'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 type ChatMessage = {
   id: string
@@ -69,6 +71,12 @@ function App() {
     setMessages(prev => [...prev, user])
     setQuestion('')
     setLoading(true)
+    // 插入助手占位消息，便于展示“思考中”
+    const assistantId = crypto.randomUUID()
+    setMessages(prev => [
+      ...prev,
+      { id: assistantId, role: 'assistant', content: '' },
+    ])
     try {
       const resp = await fetch(`${apiBaseUrl}/api/qa/ask`, {
         method: 'POST',
@@ -78,23 +86,13 @@ function App() {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const data = await resp.json()
       const fullText = (data?.answer ?? JSON.stringify(data)) as string
-      const assistantId = crypto.randomUUID()
-      // 先插入一个空内容的助手消息
-      setMessages(prev => [
-        ...prev,
-        { id: assistantId, role: 'assistant', content: '' },
-      ])
-      // 启动打字机效果（不阻塞 UI）
+      // 打字机填充占位消息
       typewrite(fullText, partial => {
         setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content: partial } : m)))
       })
     } catch (err: unknown) {
-      const assistant: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: (lang === 'en' ? 'Request failed: ' : '请求失败：') + (err as Error).message,
-      }
-      setMessages(prev => [...prev, assistant])
+      const errorText = (lang === 'en' ? 'Request failed: ' : '请求失败：') + (err as Error).message
+      setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content: errorText } : m)))
     } finally {
       setLoading(false)
     }
@@ -124,7 +122,16 @@ function App() {
         {messages.map(m => (
           <div key={m.id} className={`bubble ${m.role}`}>
             <Avatar role={m.role} />
-            <div className="content">{m.content}</div>
+            <div className={`content ${m.role === 'assistant' && loading && !m.content ? 'thinking' : ''}`}>
+              {m.role === 'assistant' ? (
+                <>
+                  {loading && !m.content && <span className="spinner" aria-label={lang === 'en' ? 'Thinking' : '正在思考'} />}
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content || ''}</ReactMarkdown>
+                </>
+              ) : (
+                m.content
+              )}
+            </div>
           </div>
         ))}
         <div ref={listEndRef} />
