@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import AsyncGenerator, Optional
+from typing import Optional
 
 import httpx
 from dotenv import load_dotenv
@@ -75,7 +75,6 @@ class AskRequest(BaseModel):
     question: str = Field(..., description="User question")
     context: Optional[str] = Field(None, description="Optional context")
     session_id: Optional[str] = Field(None, description="Conversation id")
-    stream: bool = Field(False, description="Enable SSE streaming")
 
 
 class AskResponse(BaseModel):
@@ -154,7 +153,6 @@ async def call_chat_completion(question: str, context: Optional[str] = None) -> 
         "model": MODEL,
         "messages": messages,
         "temperature": 0.7,
-        "stream": False,
     }
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(url, headers=headers, json=payload)
@@ -194,7 +192,7 @@ async def qa_ask(body: AskRequest):
                 constructed_context = constructed_context + "\n\n" + rag_context
             else:
                 constructed_context = rag_context
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             # Fallback to non-RAG if vector store errors out
             constructed_context = body.context
 

@@ -28,7 +28,8 @@ function App() {
     const saved = localStorage.getItem('lang') as Lang | null
     return saved === 'en' ? 'en' : 'zh'
   })
-  const apiBaseUrl = 'https://qa-agent-production.up.railway.app'
+  // const apiBaseUrl = 'https://qa-agent-production.up.railway.app'
+  const apiBaseUrl = 'http://localhost:8000'
   const listEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -81,7 +82,7 @@ function App() {
       const resp = await fetch(`${apiBaseUrl}/api/qa/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: user.content, stream: false }),
+        body: JSON.stringify({ question: user.content }),
       })
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const data = await resp.json()
