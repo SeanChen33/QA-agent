@@ -5,12 +5,21 @@ from typing import AsyncGenerator, Optional
 
 import httpx
 from dotenv import load_dotenv
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from typing import Any
 
-# Load environment variables from backend/.env
-load_dotenv()
+# Keyword-based routing for conditional RAG (support both package and script runs)
+try:  # Prefer absolute import when running as a module
+    from backend.routing import should_use_rag  # type: ignore
+except Exception:  # Fallback when current dir is already backend
+    from routing import should_use_rag  # type: ignore
+
+# Load environment variables from backend/.env (robust to working directory)
+_ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(_ENV_PATH)
 
 # Provider selection: "dashscope" (阿里云百炼) | "kimi" (Moonshot)
 PROVIDER = os.getenv("PROVIDER", "dashscope").lower()
@@ -74,6 +83,42 @@ class AskResponse(BaseModel):
     session_id: Optional[str] = None
 
 
+class AddDocsRequest(BaseModel):
+    ids: list[str]
+    texts: list[str]
+    metadatas: Optional[list[dict]] = None
+
+
+class SearchRequest(BaseModel):
+    query: str
+    k: int = 5
+
+
+# Optional vector store (DashScope Embedding + Chroma)
+VECTOR_PERSIST_DIR = os.getenv("VECTOR_PERSIST_DIR", "./chroma_data")
+VECTOR_COLLECTION = os.getenv("VECTOR_COLLECTION", "qa_collection")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-v3")
+vector_store: Optional[Any] = None
+
+if os.getenv("ENABLE_RAG", "false").lower() in {"1", "true", "yes"}:
+    # Lazy import to avoid requiring chromadb unless RAG is enabled
+    try:
+        from vector_store import ChromaVectorStore, DashScopeEmbedder  # type: ignore
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(
+            "ENABLE_RAG=true but optional dependencies are missing. "
+            "Please install backend/requirements.txt in the active environment."
+        ) from exc
+    if not DASHSCOPE_API_KEY:
+        raise RuntimeError("ENABLE_RAG=true requires DASHSCOPE_API_KEY for embeddings")
+    embedder = DashScopeEmbedder(api_key=DASHSCOPE_API_KEY, model=EMBEDDING_MODEL)
+    vector_store = ChromaVectorStore(
+        persist_dir=VECTOR_PERSIST_DIR,
+        collection=VECTOR_COLLECTION,
+        embedder=embedder,
+    )
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "model": MODEL, "provider": PROVIDER}
@@ -126,9 +171,53 @@ async def call_chat_completion(question: str, context: Optional[str] = None) -> 
 async def qa_ask(body: AskRequest):
     if not body.question or not body.question.strip():
         raise HTTPException(status_code=400, detail="question is required")
+    question_text = body.question.strip()
 
-    answer = await call_chat_completion(body.question.strip(), context=body.context)
+    # Only query RAG for PlatformAI/TokenAI related questions
+    constructed_context: Optional[str] = body.context
+    if should_use_rag(question_text) and vector_store is not None:
+        try:
+            results = vector_store.similarity_search(query=question_text, k=5)
+            # Build concise context from top results
+            context_chunks: list[str] = []
+            for idx, item in enumerate(results, start=1):
+                md = item.get("metadata") or {}
+                source = md.get("url") or md.get("source") or md.get("host") or ""
+                header = f"[Doc {idx}] {source}".strip()
+                doc = item.get("document") or ""
+                context_chunks.append(f"{header}\n{doc}")
+            rag_context = (
+                "You are provided with knowledge snippets about PlatformAI or TokenAI. "
+                "Use them faithfully; if missing, say you don't know.\n\n" + "\n\n---\n\n".join(context_chunks)
+            )
+            if constructed_context:
+                constructed_context = constructed_context + "\n\n" + rag_context
+            else:
+                constructed_context = rag_context
+        except Exception as exc:  # noqa: BLE001
+            # Fallback to non-RAG if vector store errors out
+            constructed_context = body.context
+
+    answer = await call_chat_completion(question_text, context=constructed_context)
     return AskResponse(answer=answer, session_id=body.session_id)
+
+
+@app.post("/api/vector/add")
+async def vector_add(body: AddDocsRequest):
+    if not vector_store:
+        raise HTTPException(status_code=400, detail="RAG/Vector store not enabled")
+    if len(body.ids) != len(body.texts):
+        raise HTTPException(status_code=400, detail="ids and texts must be same length")
+    vector_store.add_texts(ids=body.ids, texts=body.texts, metadatas=body.metadatas)
+    return {"status": "ok", "count": len(body.ids)}
+
+
+@app.post("/api/vector/search")
+async def vector_search(body: SearchRequest):
+    if not vector_store:
+        raise HTTPException(status_code=400, detail="RAG/Vector store not enabled")
+    results = vector_store.similarity_search(query=body.query, k=body.k)
+    return {"results": results}
 
 
 # For `uvicorn main:app --reload`
