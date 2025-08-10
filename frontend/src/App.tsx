@@ -28,8 +28,8 @@ function App() {
     const saved = localStorage.getItem('lang') as Lang | null
     return saved === 'en' ? 'en' : 'zh'
   })
-  // const apiBaseUrl = 'https://qa-agent-production.up.railway.app'
-  const apiBaseUrl = 'http://localhost:8000'
+  const apiBaseUrl = 'https://qa-agent-production.up.railway.app'
+  // const apiBaseUrl = 'http://localhost:8000'
   const listEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
