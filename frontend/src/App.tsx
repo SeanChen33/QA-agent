@@ -26,7 +26,7 @@ function App() {
     const saved = localStorage.getItem('lang') as Lang | null
     return saved === 'en' ? 'en' : 'zh'
   })
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined
+  const apiBaseUrl = 'https://qa-agent-production.up.railway.app'
   const listEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
