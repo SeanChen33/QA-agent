@@ -41,7 +41,7 @@ if PROVIDER == "kimi" and not KIMI_API_KEY:
 app = FastAPI(title="QA Agent Backend", version="1.0.0")
 
 # Configurable CORS
-cors_allow_origins_env = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173,http://localhost:3000,https://qa-agent-production.up.railway.app")
+cors_allow_origins_env = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173,http://localhost:3000,https://qa-agent-4vqlpnt3m-sean-chens-projects-6fe0ca6c.vercel.app")
 cors_allow_origin_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX")
 cors_allow_credentials_env = os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower()
 
